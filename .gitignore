@@ -1,3 +1,9 @@
-*.tar 
-*.gz 
-*.zip 
+ssl/
+*.key
+*.crt
+*.tar
+*.gz
+*.zip
+node_modules/
+dist/
+build/
