@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartrh-frontend
+  namespace: smartrh
+
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: smartrh-frontend
+
+  template:
+    metadata:
+      labels:
+        app: smartrh-frontend
+
+    spec:
+      containers:
+        - name: frontend
+          image: smarthr-frontend:latest
+          imagePullPolicy: Never
+
+          # 🔥 AJOUT IMPORTANT ICI
+          env:
+            - name: REACT_APP_API_URL
+              value: "http://backend:5000"
+
+          ports:
+            - containerPort: 80
