@@ -5,31 +5,29 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
         IMAGE_BACKEND = "smartrh-backend"
         IMAGE_FRONTEND = "smartrh-frontend"
-        DOCKERHUB_USER = "ton_dockerhub_username"
+        DOCKERHUB_USER = "salma217"
+        VERSION = "${BUILD_NUMBER}"
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
-                echo "📥 Cloning repository..."
                 git branch: 'main', url: 'https://github.com/SalmaHabli/PFE.git'
             }
         }
 
         stage('Build Backend') {
             steps {
-                echo "⚙️ Building backend..."
                 dir('backend') {
                     sh 'npm install'
-                    sh 'npm run build || echo "No build step found"'
+                    sh 'npm run build'
                 }
             }
         }
 
         stage('Build Frontend') {
             steps {
-                echo "⚙️ Building frontend..."
                 dir('frontend') {
                     sh 'npm install'
                     sh 'npm run build'
@@ -37,47 +35,46 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+        stage('Test Backend') {
             steps {
-                echo "🧪 Running tests..."
                 dir('backend') {
-                    sh 'npm test || echo "No tests configured"'
+                    sh 'npm test || true'
                 }
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                echo "🐳 Building Docker images..."
-
                 sh """
-                docker build -t $DOCKERHUB_USER/$IMAGE_BACKEND:latest ./backend
-                docker build -t $DOCKERHUB_USER/$IMAGE_FRONTEND:latest ./frontend
+                docker build -t $DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION ./backend
+                docker build -t $DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION ./frontend
                 """
             }
         }
 
-        stage('Login & Push to DockerHub') {
+        stage('Login DockerHub') {
             steps {
-                echo "📤 Pushing images to DockerHub..."
-
                 sh """
                 echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-
-                docker push $DOCKERHUB_USER/$IMAGE_BACKEND:latest
-                docker push $DOCKERHUB_USER/$IMAGE_FRONTEND:latest
                 """
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Push Images') {
             steps {
-                echo "☸️ Deploying to Kubernetes..."
+                sh """
+                docker push $DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION
+                docker push $DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION
+                """
+            }
+        }
 
+        stage('Deploy Kubernetes') {
+            steps {
                 sh """
                 kubectl apply -f k8s/
-                kubectl rollout restart deployment backend || true
-                kubectl rollout restart deployment frontend || true
+                kubectl set image deployment/backend backend=$DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION || true
+                kubectl set image deployment/frontend frontend=$DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION || true
                 """
             }
         }
@@ -85,11 +82,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Pipeline executed successfully!"
+            echo "🎉 SmartRH CI/CD SUCCESS"
         }
-
         failure {
-            echo "❌ Pipeline failed. Check logs."
+            echo "❌ Pipeline failed"
         }
     }
 }
