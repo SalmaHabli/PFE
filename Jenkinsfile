@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
+        DOCKERHUB_USER = "salma217"
         IMAGE_BACKEND = "smartrh-backend"
         IMAGE_FRONTEND = "smartrh-frontend"
-        DOCKERHUB_USER = "salma217"
         VERSION = "${BUILD_NUMBER}"
     }
 
@@ -13,7 +12,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/SalmaHabli/PFE.git'
+                checkout scm
             }
         }
 
@@ -52,11 +51,17 @@ pipeline {
             }
         }
 
-        stage('Login DockerHub') {
+        stage('Docker Login') {
             steps {
-                sh """
-                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials-id',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
             }
         }
 
@@ -86,6 +91,9 @@ pipeline {
         }
         failure {
             echo "❌ Pipeline failed"
+        }
+        always {
+            cleanWs()
         }
     }
 }
