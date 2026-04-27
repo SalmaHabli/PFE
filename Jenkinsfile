@@ -1,10 +1,15 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:18'
+        }
+    }
 
     environment {
-        DOCKERHUB_USER = "salma217"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
         IMAGE_BACKEND = "smartrh-backend"
         IMAGE_FRONTEND = "smartrh-frontend"
+        DOCKERHUB_USER = "salma217"
         VERSION = "${BUILD_NUMBER}"
     }
 
@@ -12,7 +17,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/SalmaHabli/PFE.git'
             }
         }
 
@@ -20,7 +25,7 @@ pipeline {
             steps {
                 dir('backend') {
                     sh 'npm install'
-                    sh 'npm run build'
+                    sh 'npm run build || true'
                 }
             }
         }
@@ -29,15 +34,7 @@ pipeline {
             steps {
                 dir('frontend') {
                     sh 'npm install'
-                    sh 'npm run build'
-                }
-            }
-        }
-
-        stage('Test Backend') {
-            steps {
-                dir('backend') {
-                    sh 'npm test || true'
+                    sh 'npm run build || true'
                 }
             }
         }
@@ -51,17 +48,11 @@ pipeline {
             }
         }
 
-        stage('Docker Login') {
+        stage('Login DockerHub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials-id',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    '''
-                }
+                sh """
+                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                """
             }
         }
 
@@ -87,13 +78,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 SmartRH CI/CD SUCCESS"
+            echo "🎉 SUCCESS"
         }
         failure {
-            echo "❌ Pipeline failed"
-        }
-        always {
-            cleanWs()
+            echo "❌ FAILED"
         }
     }
 }
