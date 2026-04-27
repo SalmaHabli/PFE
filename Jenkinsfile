@@ -19,14 +19,14 @@ pipeline {
         stage('Deploy Kubernetes') {
             steps {
                 sh '''
-                ansible-playbook -i /root/ansible-k8s/inventory /root/ansible-k8s/playbooks/deploy-k8s.yml
+                ansible-playbook -i ansible-k8s/inventory ansible-k8s/playbooks/deploy-k8s.yml
                 '''
             }
         }
 
         stage('Success') {
             steps {
-                echo 'SmartRH deployed successfully!'
+                echo 'SmartRH deployed successfully! 🚀'
             }
         }
     }
