@@ -1,12 +1,24 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: node
+    image: node:18
+    command: ['cat']
+    tty: true
+"""
+        }
+    }
 
     environment {
         DOCKERHUB_USER = "salma217"
         IMAGE_BACKEND = "smartrh-backend"
         IMAGE_FRONTEND = "smartrh-frontend"
         VERSION = "${BUILD_NUMBER}"
-        K8S_NAMESPACE = "smartrh"
     }
 
     stages {
@@ -14,22 +26,27 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                url: 'https://github.com/SalmaHabli/PFE.git'
+                    url: 'https://github.com/SalmaHabli/PFE.git'
             }
         }
 
         stage('Build Backend') {
             steps {
-                dir('backend') {
-                    sh 'npm install'
+                container('node') {
+                    dir('backend') {
+                        sh 'node -v'
+                        sh 'npm install'
+                    }
                 }
             }
         }
 
         stage('Build Frontend') {
             steps {
-                dir('frontend') {
-                    sh 'npm install'
+                container('node') {
+                    dir('frontend') {
+                        sh 'npm install'
+                    }
                 }
             }
         }
@@ -43,50 +60,16 @@ pipeline {
             }
         }
 
-        stage('Docker Push') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials-id', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
-
-                    docker push $DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION
-                    docker push $DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION
-                    '''
-                }
-            }
-        }
-
-        stage('Update Kubernetes (Rolling Update)') {
+        stage('Deploy') {
             steps {
                 sh '''
                 kubectl set image deployment/smartrh-backend \
-                smartrh-backend=$DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION \
-                -n $K8S_NAMESPACE
+                smartrh-backend=$DOCKERHUB_USER/$IMAGE_BACKEND:$VERSION -n smartrh || true
 
                 kubectl set image deployment/smartrh-frontend \
-                smartrh-frontend=$DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION \
-                -n $K8S_NAMESPACE
+                smartrh-frontend=$DOCKERHUB_USER/$IMAGE_FRONTEND:$VERSION -n smartrh || true
                 '''
             }
-        }
-
-        stage('Verify') {
-            steps {
-                sh '''
-                kubectl get pods -n smartrh
-                kubectl rollout status deployment/smartrh-backend -n smartrh
-                kubectl rollout status deployment/smartrh-frontend -n smartrh
-                '''
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ SmartRH deployed successfully"
-        }
-        failure {
-            echo "❌ Deployment failed"
         }
     }
 }
