@@ -1,57 +1,26 @@
 pipeline {
-    agent any
-
-    environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
-        IMAGE_BACKEND = "smartrh-backend"
-        IMAGE_FRONTEND = "smartrh-frontend"
-        DOCKERHUB_USER = "salma217"
-        VERSION = "${BUILD_NUMBER}"
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: node
+    image: node:18
+    command: ['cat']
+    tty: true
+'''
+        }
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Build') {
             steps {
-                git branch: 'main', url: 'https://github.com/SalmaHabli/PFE.git'
-            }
-        }
-
-        stage('Build Backend') {
-            steps {
-                dir('backend') {
-                    sh 'npm install'
+                container('node') {
+                    sh 'node -v'
+                    sh 'npm -v'
                 }
-            }
-        }
-
-        stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'npm install'
-                }
-            }
-        }
-
-        stage('Docker Build & Push') {
-            steps {
-                sh '''
-                docker build -t salma217/smartrh-backend:${BUILD_NUMBER} ./backend
-                docker build -t salma217/smartrh-frontend:${BUILD_NUMBER} ./frontend
-
-                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-
-                docker push salma217/smartrh-backend:${BUILD_NUMBER}
-                docker push salma217/smartrh-frontend:${BUILD_NUMBER}
-                '''
-            }
-        }
-
-        stage('Deploy K8s') {
-            steps {
-                sh '''
-                kubectl apply -f k8s/
-                '''
             }
         }
     }
